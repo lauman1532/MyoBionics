@@ -35,7 +35,8 @@ void init_myobridge_almond()
   bridge.setEMGDataCallBack(get_EMG_data); // sets a function for handling data
   bridge.setEMGMode(EMG_MODE_NONE); // EMG_MODE_SEND: filtered EMG data; EMG_MODE_RAW: raw data
   bridge.setIMUDataCallBack(get_IMU_data); // sets a function for handling IMU data
-  bridge.setIMUMode(IMU_MODE_SEND_DATA); // IMU_MODE_SEND_ALL; IMU_MODE_SEND_DATA: accelerometer, gyroscope, and orientation data; IMU_MODE_SEND_RAW: raw data
+  bridge.setIMUMode(IMU_MODE_SEND_DATA); /* IMU_MODE_SEND_ALL; IMU_MODE_SEND_DATA: accelerometer, gyroscope, and orientation data
+                                         IMU_MODE_SEND_RAW: raw data*/
   bridge.enablePoseData();
 
   bridge.vibrate(3);
@@ -61,31 +62,31 @@ void handle_pose(MyoPoseData& poseData)
     
     case MYO_POSE_FINGERS_SPREAD: // When fingers are spread
     {
-      openHand(); // opens all fingers
+      open_hand(); // opens all fingers
       break;
     }
 
     case MYO_POSE_DOUBLE_TAP: // When double tap is detected
     {
-      stopHand(); //stop motors at desired position
+      stop_hand(); //stop motors at desired position
       break;
     }
 
     case MYO_POSE_WAVE_IN: // When 'wave_in' motion is detected
     {
-      tripodGrip(); // Assigns a tripod grip
+      tripod_grip(); // Assigns a tripod grip
       break;
     }
 
     case MYO_POSE_WAVE_OUT: // When 'wave_out' motion is detected
     {
-      pointHand(); // Points finger
+      point_hand(); // Points finger
       break;
     }
 
     case MYO_POSE_FIST: // When a fist gesture is detected
     {
-      closeHand(); // closes fingers
+      close_hand(); // closes fingers
       break;
     }
   }
@@ -135,7 +136,7 @@ void init_motors()
 }
 
 //-----------hand-----------//
-void openHand() // function from examples of FingerLib.h, opens hand
+void open_hand() // function from examples of FingerLib.h, opens hand
 {
   for (int i = 0; i < 5; i++)
   {
@@ -143,7 +144,7 @@ void openHand() // function from examples of FingerLib.h, opens hand
   }
 }
 
-void closeHand() // function from examples of FingerLib.h, closes hand
+void close_hand() // function from examples of FingerLib.h, closes hand
 {
   unsigned long startTime = millis();
   unsigned long timeElapsed = 0;
@@ -153,8 +154,8 @@ void closeHand() // function from examples of FingerLib.h, closes hand
     finger[i].close();
   }
   
-  while(finger[0].readPosError() > 0 && finger[1].readPosError() > 0 && finger[2].readPosError() > 0
-  && finger[3].readPosError() > 0 && finger[4].readPosError() > 0)
+  while(finger[0].readPosError() > 0 || finger[1].readPosError() > 0 || finger[2].readPosError() > 0
+  || finger[3].readPosError() > 0 || finger[4].readPosError() > 0)
   {
     timeElapsed = startTime - millis();
     if(timeElapsed > 5000) // prevent damaging the fingers if they can't be closed
@@ -183,7 +184,7 @@ void closeHand() // function from examples of FingerLib.h, closes hand
   }
 }
 
-void stopHand() // stops motors
+void stop_hand() // stops motors
 {
   for (int i = 0; i < 5; i++)
   {
@@ -191,7 +192,7 @@ void stopHand() // stops motors
   }
 }
 
-void tripodGrip() // performs a tripod grip
+void tripod_grip() // performs a tripod grip
 {
   for (int i = 0; i < 3; i++)
   {
@@ -199,7 +200,7 @@ void tripodGrip() // performs a tripod grip
   }
 }
 
-void pointHand() // points hand
+void point_hand() // points hand
 {
   for (int i = 0; i < 5; i++)
   {
