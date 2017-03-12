@@ -1,10 +1,13 @@
 #include <SoftwareSerial.h>
 #include <MyoBridge.h>
-#include <FingerLib.h>
+#include <FingerLib.h> // FingerLib v2.0.1 updated 7th Feb 2017
 
-SoftwareSerial bridgeSerial(13, 14); // For Almond: RX3 = 13 or 52, TX3 = 14 or 51; For Arduino: RX = 2, TX = 3
+//-----------global var-----------//
+SoftwareSerial bridgeSerial(13, 14); // For Almond (UART): RX3 = 13, TX3 = 14; For Arduino: RX = 2, TX = 3
 MyoBridge bridge(bridgeSerial);
 Finger finger[5];
+int posMax = 973; int posMin = 50;
+int speedMax = 250; int speedMin = 180;
 
 // Initialisation of MyoBridge and Almond
 void init_myobridge_almond()
@@ -39,7 +42,7 @@ void init_myobridge_almond()
                                          IMU_MODE_SEND_RAW: raw data*/
   bridge.enablePoseData();
 
-  bridge.vibrate(3);
+  bridge.vibrate(2);
   bridge.unlockMyo();
   bridge.disableSleep(); // disables sleep mode
 }
@@ -57,33 +60,32 @@ void handle_pose(MyoPoseData& poseData)
   {
     case MYO_POSE_REST:
     {
-      
+      break;
     }
-    
+    case MYO_POSE_UNKNOWN:
+    {
+      break;
+    }  
     case MYO_POSE_FINGERS_SPREAD: // When fingers are spread
     {
       open_hand(); // opens all fingers
       break;
     }
-
     case MYO_POSE_DOUBLE_TAP: // When double tap is detected
     {
       stop_hand(); //stop motors at desired position
       break;
     }
-
     case MYO_POSE_WAVE_IN: // When 'wave_in' motion is detected
     {
       tripod_grip(); // Assigns a tripod grip
       break;
     }
-
     case MYO_POSE_WAVE_OUT: // When 'wave_out' motion is detected
     {
       point_hand(); // Points finger
       break;
     }
-
     case MYO_POSE_FIST: // When a fist gesture is detected
     {
       close_hand(); // closes fingers
@@ -94,7 +96,7 @@ void handle_pose(MyoPoseData& poseData)
 
 void get_EMG_data(int8_t EMGData[8]) // EMG data is 8-bit signed integers
 {
-  // not yet implemented
+  // not implemented
 }
 
 void get_IMU_data(MyoIMUData& IMUdata)
@@ -114,13 +116,17 @@ void pin_assignment(int& handFlag) // Needed for Almond (FingerLib)
     finger[3].attach(10, 9, A3);
     finger[4].attach(11, 12, A4);
   }
-  else
+  else if(handFlag == LEFT)
   {
     finger[0].attach(5, 2, A0);
     finger[1].attach(11, 12, A4);
     finger[2].attach(10, 9, A3);
     finger[3].attach(7, 8, A2);
     finger[4].attach(3, 6, A1);
+  }
+  else
+  {
+    MYSERIAL.println("Can't assign pin.");
   }
 }
 
@@ -129,18 +135,19 @@ void init_motors()
   int i = 0;
   do
   {
-    finger[i].setPosLimits(50, 975);
-    finger[i].setSpeedLimits(150, 250); // 0 - 150 leads to no movement
+    finger[i].setPosLimits(posMin, posMax);
+    finger[i].setSpeedLimits(posMin, speedMax); // 0 - 150 leads to no movement, 180 to reduce audible hum
     i++;
-  }while(i < 6);
+  }while(i < 5);
 }
 
 //-----------hand-----------//
 void open_hand() // function from examples of FingerLib.h, opens hand
 {
-  for (int i = 0; i < 5; i++)
+  for (int i = 0; i < 4; i++)
   {
     finger[i].open();
+    delay(100);
   }
 }
 
@@ -149,37 +156,28 @@ void close_hand() // function from examples of FingerLib.h, closes hand
   unsigned long startTime = millis();
   unsigned long timeElapsed = 0;
   
-  for (int i = 0; i < 5; i++)
+  for (int i = 4; i >= 0; i--)
   {
     finger[i].close();
+    delay(100);
   }
   
-  while(finger[0].readPosError() > 0 || finger[1].readPosError() > 0 || finger[2].readPosError() > 0
-  || finger[3].readPosError() > 0 || finger[4].readPosError() > 0)
+  while(!finger[0].reachedPos(5) || !finger[1].reachedPos(5) || !finger[2].reachedPos(5)
+  || !finger[3].reachedPos(5) || !finger[4].reachedPos(5))
   {
-    timeElapsed = startTime - millis();
-    if(timeElapsed > 5000) // prevent damaging the fingers if they can't be closed
+    timeElapsed = millis() - startTime;
+    if(timeElapsed > 3000) // prevent damaging the fingers if they can't be closed
     {
-      if(finger[0].readPosError() > 0)
-      {
+      if(!finger[0].reachedPos(5))
         finger[0].stopMotor();
-      }
-      if(finger[1].readPosError() > 0)
-      {
+      if(!finger[1].reachedPos(5))
         finger[1].stopMotor();
-      }
-      if(finger[2].readPosError() > 0)
-      {
+      if(!finger[2].reachedPos(5))
         finger[2].stopMotor();
-      }
-      if(finger[3].readPosError() > 0)
-      {
+      if(!finger[3].reachedPos(5))
         finger[3].stopMotor();
-      }
-      if(finger[4].readPosError() > 0)
-      {
+      if(!finger[4].reachedPos(5))
         finger[4].stopMotor();
-      }
     }
   }
 }
@@ -194,6 +192,12 @@ void stop_hand() // stops motors
 
 void tripod_grip() // performs a tripod grip
 {
+  if(finger[3].readPos() != 512 || finger[4].readPos() != 512)
+  {
+    finger[3].writePos(512);
+    finger[4].writePos(512);
+    delay(100);
+  }
   for (int i = 0; i < 3; i++)
   {
     finger[i].close();
@@ -214,10 +218,10 @@ void point_hand() // points hand
 //------other functions------//
 void check_low_battery()
 {
-  byte batteryLevel = bridge.getBatteryLevel();
-  if(batteryLevel < 10)
+  if(bridge.getBatteryLevel() < 10)
   {
     MYSERIAL.println("Myoband: low battery!");
+    bridge.vibrate(3);
   }
 }
 
