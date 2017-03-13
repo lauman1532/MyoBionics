@@ -6,6 +6,8 @@
 SoftwareSerial bridgeSerial(13, 14); // For Almond (UART): RX3 = 13, TX3 = 14; For Arduino: RX = 2, TX = 3
 MyoBridge bridge(bridgeSerial);
 Finger finger[5];
+int speedLock = 0; // Initialise speed lock for orientation (0 = No IMU Data; 1 = Use stored IMU data; 2 = Store IMU Data)
+// Vick: I will try to implement the speedLock using EMG, meanwhile please use IMU.
 int posMax = 973; int posMin = 50;
 int speedMax = 250; int speedMin = 180;
 
@@ -60,34 +62,41 @@ void handle_pose(MyoPoseData& poseData)
   {
     case MYO_POSE_REST:
     {
+      speedLock = 0;
       break;
     }
     case MYO_POSE_UNKNOWN:
     {
+      speedLock = 2;
       break;
     }  
     case MYO_POSE_FINGERS_SPREAD: // When fingers are spread
     {
+      speedLock = 2;
       open_hand(); // opens all fingers
       break;
     }
     case MYO_POSE_DOUBLE_TAP: // When double tap is detected
     {
+      speedLock = 0;
       stop_hand(); //stop motors at desired position
       break;
     }
     case MYO_POSE_WAVE_IN: // When 'wave_in' motion is detected
     {
+      speedLock = 2;
       tripod_grip(); // Assigns a tripod grip
       break;
     }
     case MYO_POSE_WAVE_OUT: // When 'wave_out' motion is detected
     {
+      speedLock = 2;
       point_hand(); // Points finger
       break;
     }
     case MYO_POSE_FIST: // When a fist gesture is detected
     {
+      speedLock = 2;
       close_hand(); // closes fingers
       break;
     }
@@ -192,6 +201,9 @@ void stop_hand() // stops motors
 
 void tripod_grip() // performs a tripod grip
 {
+  unsigned long startTime = millis();
+  unsigned long timeElapsed = 0;
+  
   if(finger[3].readPos() != 512 || finger[4].readPos() != 512)
   {
     finger[3].writePos(512);
@@ -202,11 +214,24 @@ void tripod_grip() // performs a tripod grip
   {
     finger[i].close();
   }
+  while(!finger[0].reachedPos(5) || !finger[1].reachedPos(5) || !finger[2].reachedPos(5))
+  {
+    timeElapsed = millis() - startTime;
+    if(timeElapsed > 3000) // prevent damaging the fingers if they can't be closed
+    {
+      if(!finger[0].reachedPos(5))
+        finger[0].stopMotor();
+      if(!finger[1].reachedPos(5))
+        finger[1].stopMotor();
+      if(!finger[2].reachedPos(5))
+        finger[2].stopMotor();
+    }
+  }
 }
 
 void point_hand() // points hand
 {
-  for (int i = 0; i < 5; i++)
+  for (int i = 4; i >= 0; i--)
   {
     if (i != 1)
     {
